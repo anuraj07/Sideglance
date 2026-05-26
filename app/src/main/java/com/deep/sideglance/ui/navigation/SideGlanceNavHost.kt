@@ -15,6 +15,9 @@ import com.deep.sideglance.ui.screens.pair.PairingScreen
 import com.deep.sideglance.ui.screens.welcome.WelcomeScreen
 import kotlinx.coroutines.launch
 
+import androidx.compose.ui.platform.LocalContext
+import com.deep.sideglance.data.service.SideGlanceSyncService
+
 @Composable
 fun SideGlanceNavHost(
     modifier: Modifier = Modifier,
@@ -23,9 +26,20 @@ fun SideGlanceNavHost(
     val scope = rememberCoroutineScope()
     val authRepository = remember { ServiceLocator.authRepository }
     val partnerRepository = remember { ServiceLocator.partnerRepository }
+    val context = LocalContext.current
     
     // Auth State
     val currentUser by authRepository.currentUser.collectAsState()
+    
+    // Start/stop sync service dynamically based on pairing & auth status
+    LaunchedEffect(currentUser) {
+        val user = currentUser
+        if (user != null && user.partnerUid != null) {
+            SideGlanceSyncService.start(context)
+        } else {
+            SideGlanceSyncService.stop(context)
+        }
+    }
     
     // Local flow session checks
     var isCheckingSession by remember { mutableStateOf(true) }

@@ -186,8 +186,6 @@ fun DashboardScreen(
         }
     }
 
-    var lastPartnerStatusTimestamp by remember { mutableStateOf<Long?>(null) }
-
     // Observe partner status & user info if exists
     val partnerUid = user.partnerUid
     LaunchedEffect(partnerUid) {
@@ -200,21 +198,6 @@ fun DashboardScreen(
             }
             launch {
                 statusRepo.observePartnerStatus(partnerUid).collect { pStatus ->
-                    // Trigger a notification if new Status is updated by partner
-                    if (pStatus != null && !pStatus.isExpired) {
-                        if (lastPartnerStatusTimestamp != null && pStatus.timestamp > lastPartnerStatusTimestamp!!) {
-                            val partnerName = partnerUser?.displayName ?: "Partner"
-                            NotificationHelper.showPartnerStatusNotification(
-                                context = context,
-                                partnerName = partnerName,
-                                statusText = pStatus.statusType,
-                                detailText = pStatus.detail
-                            )
-                        }
-                        lastPartnerStatusTimestamp = pStatus.timestamp
-                    } else if (pStatus == null || pStatus.isExpired) {
-                        lastPartnerStatusTimestamp = null
-                    }
                     partnerStatus = pStatus
                     triggerWidgetUpdate(context, partnerUser, pStatus, myLat, myLng, hasLocationPermission && isLocationOptIn)
                 }
