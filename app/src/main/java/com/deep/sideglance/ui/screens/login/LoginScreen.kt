@@ -1,7 +1,6 @@
 package com.deep.sideglance.ui.screens.login
 
 import android.util.Log
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -30,9 +29,6 @@ import kotlinx.coroutines.launch
 fun LoginScreen(
     onLoginSuccess: suspend (displayName: String, email: String, idToken: String, photoUrl: String?) -> Result<Unit>
 ) {
-    var isMockModeActive by remember { mutableStateOf(false) } // Default to false so Google Sign-In is presented first
-    var nameInput by remember { mutableStateOf("") }
-    var emailInput by remember { mutableStateOf("") }
     var isLoading by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
     val scope = rememberCoroutineScope()
@@ -89,7 +85,7 @@ fun LoginScreen(
                 )
             }
 
-            // Login forms / Sign-in buttons
+            // Google Sign-In UI Button
             Column(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalAlignment = Alignment.CenterHorizontally
@@ -104,194 +100,100 @@ fun LoginScreen(
                     )
                 }
 
-                if (isMockModeActive) {
-                    // Minimal Mock input form to test quickly offline
-                    Card(
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                        shape = RoundedCornerShape(24.dp)
-                    ) {
-                        Column(
-                            modifier = Modifier.padding(20.dp),
-                            horizontalAlignment = Alignment.CenterHorizontally
-                        ) {
-                            Text(
-                                text = "Mock Sign-In (No Config Required)",
-                                style = MaterialTheme.typography.titleMedium,
-                                color = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.padding(bottom = 16.dp)
-                            )
-
-                            OutlinedTextField(
-                                value = nameInput,
-                                onValueChange = { nameInput = it },
-                                label = { Text("Your Name") },
-                                modifier = Modifier.fillMaxWidth(),
-                                shape = RoundedCornerShape(12.dp),
-                                colors = OutlinedTextFieldDefaults.colors(
-                                    focusedBorderColor = MaterialTheme.colorScheme.primary,
-                                    unfocusedBorderColor = MaterialTheme.colorScheme.outline
+                Button(
+                    onClick = {
+                        isLoading = true
+                        errorMessage = null
+                        scope.launch {
+                            try {
+                                // 1. Get Client ID from Firebase generated resources
+                                val webClientIdResId = context.resources.getIdentifier(
+                                    "default_web_client_id", "string", context.packageName
                                 )
-                            )
+                                if (webClientIdResId == 0) {
+                                    throw Exception("Google Sign-In configuration (google-services.json) is missing or not compiled. Please verify Google setup.")
+                                }
+                                val webClientId = context.getString(webClientIdResId)
 
-                            Spacer(modifier = Modifier.height(12.dp))
+                                // 2. Configure GetGoogleIdOption
+                                val googleIdOption = GetGoogleIdOption.Builder()
+                                    .setFilterByAuthorizedAccounts(false)
+                                    .setServerClientId(webClientId)
+                                    .setAutoSelectEnabled(true)
+                                    .build()
 
-                            OutlinedTextField(
-                                value = emailInput,
-                                onValueChange = { emailInput = it },
-                                label = { Text("Your Email") },
-                                modifier = Modifier.fillMaxWidth(),
-                                shape = RoundedCornerShape(12.dp),
-                                colors = OutlinedTextFieldDefaults.colors(
-                                    focusedBorderColor = MaterialTheme.colorScheme.primary,
-                                    unfocusedBorderColor = MaterialTheme.colorScheme.outline
+                                // 3. Build GetCredentialRequest
+                                val request = GetCredentialRequest.Builder()
+                                    .addCredentialOption(googleIdOption)
+                                    .build()
+
+                                // 4. Request credential
+                                val result = credentialManager.getCredential(
+                                    context = context,
+                                    request = request
                                 )
-                            )
 
-                            Spacer(modifier = Modifier.height(20.dp))
+                                // 5. Parse result
+                                val credential = result.credential
+                                if (credential is CustomCredential && 
+                                    credential.type == GoogleIdTokenCredential.TYPE_GOOGLE_ID_TOKEN_CREDENTIAL
+                                ) {
+                                    val googleIdTokenCredential = GoogleIdTokenCredential.createFrom(credential.data)
+                                    val idToken = googleIdTokenCredential.idToken
+                                    val email = googleIdTokenCredential.id
+                                    val displayName = googleIdTokenCredential.displayName ?: googleIdTokenCredential.givenName ?: "Google User"
+                                    val photoUrl = googleIdTokenCredential.profilePictureUri?.toString()
 
-                            Button(
-                                onClick = {
-                                    if (nameInput.isNotBlank()) {
-                                        isLoading = true
-                                        scope.launch {
-                                            val email = emailInput.ifBlank { "${nameInput.lowercase().replace(" ", "")}@example.com" }
-                                            onLoginSuccess(nameInput, email, "mock_google_id_token", null)
-                                                .onFailure { error ->
-                                                    errorMessage = error.message ?: "Login failed"
-                                                }
-                                            isLoading = false
+                                    onLoginSuccess(displayName, email, idToken, photoUrl)
+                                        .onFailure { error ->
+                                            errorMessage = error.message ?: "Firebase login failed"
                                         }
-                                    } else {
-                                        errorMessage = "Please enter your name"
-                                    }
-                                },
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(48.dp),
-                                shape = RoundedCornerShape(12.dp),
-                                enabled = !isLoading
-                            ) {
-                                if (isLoading) {
-                                    CircularProgressIndicator(
-                                        modifier = Modifier.size(24.dp),
-                                        color = MaterialTheme.colorScheme.onPrimary
-                                    )
                                 } else {
-                                    Text("Sign In (Offline Mock)")
+                                    errorMessage = "Unexpected credential type: ${credential.type}"
                                 }
+                            } catch (e: GetCredentialException) {
+                                Log.e("LoginScreen", "Credential Manager failed", e)
+                                errorMessage = "Google Sign-In failed: ${e.message}"
+                            } catch (e: Exception) {
+                                Log.e("LoginScreen", "Sign-in failed", e)
+                                errorMessage = e.message ?: "An unexpected error occurred"
+                            } finally {
+                                isLoading = false
                             }
                         }
-                    }
-
-                    Spacer(modifier = Modifier.height(16.dp))
-
-                    TextButton(onClick = { isMockModeActive = false }) {
-                        Text("Use Real Google Sign-In", color = MaterialTheme.colorScheme.secondary)
-                    }
-                } else {
-                    // Google Sign-In UI Button
-                    Button(
-                        onClick = {
-                            isLoading = true
-                            errorMessage = null
-                            scope.launch {
-                                try {
-                                    // 1. Get Client ID from Firebase generated resources
-                                    val webClientIdResId = context.resources.getIdentifier(
-                                        "default_web_client_id", "string", context.packageName
-                                    )
-                                    if (webClientIdResId == 0) {
-                                        throw Exception("Google Sign-In configuration (google-services.json) is missing or not compiled. Please use Mock Sign-In.")
-                                    }
-                                    val webClientId = context.getString(webClientIdResId)
-
-                                    // 2. Configure GetGoogleIdOption
-                                    val googleIdOption = GetGoogleIdOption.Builder()
-                                        .setFilterByAuthorizedAccounts(false)
-                                        .setServerClientId(webClientId)
-                                        .setAutoSelectEnabled(true)
-                                        .build()
-
-                                    // 3. Build GetCredentialRequest
-                                    val request = GetCredentialRequest.Builder()
-                                        .addCredentialOption(googleIdOption)
-                                        .build()
-
-                                    // 4. Request credential
-                                    val result = credentialManager.getCredential(
-                                        context = context,
-                                        request = request
-                                    )
-
-                                    // 5. Parse result
-                                    val credential = result.credential
-                                    if (credential is CustomCredential && 
-                                        credential.type == GoogleIdTokenCredential.TYPE_GOOGLE_ID_TOKEN_CREDENTIAL
-                                    ) {
-                                        val googleIdTokenCredential = GoogleIdTokenCredential.createFrom(credential.data)
-                                        val idToken = googleIdTokenCredential.idToken
-                                        val email = googleIdTokenCredential.id
-                                        val displayName = googleIdTokenCredential.displayName ?: googleIdTokenCredential.givenName ?: "Google User"
-                                        val photoUrl = googleIdTokenCredential.profilePictureUri?.toString()
-
-                                        onLoginSuccess(displayName, email, idToken, photoUrl)
-                                            .onFailure { error ->
-                                                errorMessage = error.message ?: "Firebase login failed"
-                                            }
-                                    } else {
-                                        errorMessage = "Unexpected credential type: ${credential.type}"
-                                    }
-                                } catch (e: GetCredentialException) {
-                                    Log.e("LoginScreen", "Credential Manager failed", e)
-                                    errorMessage = "Google Sign-In failed: ${e.message}"
-                                } catch (e: Exception) {
-                                    Log.e("LoginScreen", "Sign-in failed", e)
-                                    errorMessage = e.message ?: "An unexpected error occurred"
-                                } finally {
-                                    isLoading = false
-                                }
-                            }
-                        },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(56.dp),
-                        shape = RoundedCornerShape(16.dp),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = MaterialTheme.colorScheme.surfaceVariant,
-                            contentColor = MaterialTheme.colorScheme.onSurfaceVariant
-                        ),
-                        enabled = !isLoading
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(56.dp),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                        contentColor = MaterialTheme.colorScheme.onSurfaceVariant
+                    ),
+                    enabled = !isLoading
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.Center
                     ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.Center
-                        ) {
-                            if (isLoading) {
-                                CircularProgressIndicator(
-                                    modifier = Modifier.size(24.dp),
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            } else {
-                                Icon(
-                                    painter = painterResource(id = R.drawable.ic_google),
-                                    contentDescription = "Google Logo",
-                                    tint = Color.Unspecified,
-                                    modifier = Modifier.size(24.dp)
-                                )
-                                Spacer(modifier = Modifier.width(12.dp))
-                                Text(
-                                    text = "Continue with Google",
-                                    style = MaterialTheme.typography.labelLarge
-                                )
-                            }
+                        if (isLoading) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(24.dp),
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        } else {
+                            Icon(
+                                painter = painterResource(id = R.drawable.ic_google),
+                                contentDescription = "Google Logo",
+                                tint = Color.Unspecified,
+                                modifier = Modifier.size(24.dp)
+                            )
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Text(
+                                text = "Continue with Google",
+                                style = MaterialTheme.typography.labelLarge
+                            )
                         }
-                    }
-
-                    Spacer(modifier = Modifier.height(16.dp))
-
-                    TextButton(onClick = { isMockModeActive = true }) {
-                        Text("Back to Mock Mode", color = MaterialTheme.colorScheme.secondary)
                     }
                 }
             }
