@@ -25,7 +25,7 @@ android {
             storeFile = file("keystore.jks")
             storePassword = "123456"
             keyAlias = "key0"
-            keyPassword = "123456"
+            keyPassword = "098765"
         }
     }
 
