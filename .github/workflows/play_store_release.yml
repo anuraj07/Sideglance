@@ -118,7 +118,7 @@ jobs:
       - name: Upload to Google Play Closed Testing (Alpha Track)
         uses: r0adkll/upload-google-play@v1
         with:
-          serviceAccountJson: ${{ secrets.PLAY_CONSOLE_SERVICE_ACCOUNT_JSON }}
+          serviceAccountJsonPlainText: ${{ secrets.PLAY_CONSOLE_SERVICE_ACCOUNT_JSON }}
           packageName: com.deep.sideglance
           releaseFiles: app/build/outputs/bundle/release/app-release.aab
           track: alpha
