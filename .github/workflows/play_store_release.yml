@@ -98,7 +98,7 @@ jobs:
           git checkout -b "$BRANCH_NAME"
           git add app/build.gradle.kts
           git commit -m "chore: Bump version to ${{ steps.bump_version.outputs.new_version_name }} (code: ${{ steps.bump_version.outputs.new_version_code }})"
-          git push origin "$BRANCH_NAME"
+          git push origin "$BRANCH_NAME" --force
 
       - name: Decrypt Keystore
         run: |
