@@ -73,12 +73,28 @@ To secure your Cloud Firestore database, apply the following security rules in y
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+    // User Profiles
     match /users/{userId} {
-      allow read, write: if request.auth != null;
+      // Authenticated users can read profiles to find partners
+      allow read: if request.auth != null;
+      // Only the user themselves can update their profile information (e.g. location, partnerUid)
+      allow write: if request.auth != null && request.auth.uid == userId;
     }
+    
+    // User Statuses, Reactions & Chat Messages
     match /statuses/{userId} {
-      allow read, write: if request.auth != null;
+      // Authenticated users can read statuses
+      allow read: if request.auth != null;
+      
+      // Allow writing if:
+      // 1. The user is updating their own status
+      // 2. The paired partner is adding reactions/messages
+      allow write: if request.auth != null && (
+        request.auth.uid == userId ||
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.partnerUid == userId
+      );
     }
   }
 }
 ```
+

@@ -7,10 +7,17 @@ import com.deep.sideglance.domain.model.User
 import com.deep.sideglance.domain.repository.StatusRepository
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.FirebaseFirestoreException
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.tasks.await
+import com.deep.sideglance.domain.model.StatusMessage
+import com.deep.sideglance.domain.model.StatusReaction
+import com.deep.sideglance.data.model.FirestoreStatusMessage
+import com.deep.sideglance.data.model.FirestoreStatusReaction
+import com.google.firebase.firestore.FieldValue
+import com.google.firebase.firestore.SetOptions
 
 class FirebaseStatusRepositoryImpl : StatusRepository {
     private val auth: FirebaseAuth by lazy { FirebaseAuth.getInstance() }
@@ -43,7 +50,11 @@ class FirebaseStatusRepositoryImpl : StatusRepository {
             .document(partnerUid)
             .addSnapshotListener { snapshot, error ->
                 if (error != null) {
-                    close(error)
+                    if (error.code == FirebaseFirestoreException.Code.PERMISSION_DENIED) {
+                        close()
+                    } else {
+                        close(error)
+                    }
                     return@addSnapshotListener
                 }
                 val firestoreStatus = snapshot?.toObject(FirestoreStatus::class.java)
@@ -57,7 +68,11 @@ class FirebaseStatusRepositoryImpl : StatusRepository {
             .document(partnerUid)
             .addSnapshotListener { snapshot, error ->
                 if (error != null) {
-                    close(error)
+                    if (error.code == FirebaseFirestoreException.Code.PERMISSION_DENIED) {
+                        close()
+                    } else {
+                        close(error)
+                    }
                     return@addSnapshotListener
                 }
                 val user = snapshot?.toObject(FirestoreUser::class.java)
@@ -75,7 +90,11 @@ class FirebaseStatusRepositoryImpl : StatusRepository {
             .document(partnerUid)
             .addSnapshotListener { snapshot, error ->
                 if (error != null) {
-                    close(error)
+                    if (error.code == FirebaseFirestoreException.Code.PERMISSION_DENIED) {
+                        close()
+                    } else {
+                        close(error)
+                    }
                     return@addSnapshotListener
                 }
                 val user = snapshot?.toObject(FirestoreUser::class.java)
@@ -99,4 +118,26 @@ class FirebaseStatusRepositoryImpl : StatusRepository {
             .await()
         snapshot.toObject(FirestoreUser::class.java)?.toDomain()
     }.getOrNull()
+
+    override suspend fun addReactionToStatus(statusOwnerUid: String, reaction: StatusReaction): Result<Unit> = runCatching {
+        val firestoreReaction = FirestoreStatusReaction.fromDomain(reaction)
+        firestore.collection("statuses")
+            .document(statusOwnerUid)
+            .set(
+                mapOf("reactions" to FieldValue.arrayUnion(firestoreReaction)),
+                SetOptions.merge()
+            )
+            .await()
+    }
+
+    override suspend fun addMessageToStatus(statusOwnerUid: String, message: StatusMessage): Result<Unit> = runCatching {
+        val firestoreMessage = FirestoreStatusMessage.fromDomain(message)
+        firestore.collection("statuses")
+            .document(statusOwnerUid)
+            .set(
+                mapOf("messages" to FieldValue.arrayUnion(firestoreMessage)),
+                SetOptions.merge()
+            )
+            .await()
+    }
 }

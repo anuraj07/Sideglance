@@ -1,6 +1,8 @@
 package com.deep.sideglance.domain.repository
 
 import com.deep.sideglance.domain.model.UserStatus
+import com.deep.sideglance.domain.model.StatusMessage
+import com.deep.sideglance.domain.model.StatusReaction
 import com.deep.sideglance.domain.model.User
 import kotlinx.coroutines.flow.Flow
 
@@ -12,4 +14,6 @@ interface StatusRepository {
     fun observePartnerUser(partnerUid: String): Flow<User?>
     suspend fun getPartnerStatus(partnerUid: String): UserStatus?
     suspend fun getPartnerUser(partnerUid: String): User?
+    suspend fun addReactionToStatus(statusOwnerUid: String, reaction: StatusReaction): Result<Unit>
+    suspend fun addMessageToStatus(statusOwnerUid: String, message: StatusMessage): Result<Unit>
 }

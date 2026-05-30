@@ -31,6 +31,9 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.automirrored.filled.Send
 import com.deep.sideglance.data.ServiceLocator
 import com.deep.sideglance.domain.model.User
 import com.deep.sideglance.domain.model.UserStatus
@@ -311,14 +314,15 @@ fun DashboardScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
-                .padding(24.dp),
-            verticalArrangement = Arrangement.SpaceBetween,
+                .padding(24.dp)
+                .verticalScroll(rememberScrollState()),
+            verticalArrangement = Arrangement.spacedBy(24.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             if (partnerUid == null) {
                 // UNPAIRED STATE UI
                 Column(
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier.fillMaxWidth(),
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.Center
                 ) {
@@ -366,8 +370,7 @@ fun DashboardScreen(
                 // PAIRED STATE UI
                 Column(
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .weight(1f),
+                        .fillMaxWidth(),
                     verticalArrangement = Arrangement.spacedBy(24.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
@@ -395,19 +398,37 @@ fun DashboardScreen(
                             // Big status type representation
                             val status = partnerStatus
                             if (status != null && !status.isExpired) {
-                                Text(
-                                    text = status.statusType,
-                                    fontSize = 48.sp,
-                                    modifier = Modifier.padding(vertical = 8.dp)
-                                )
+                                val (emoji, title) = splitStatusType(status.statusType)
+                                if (emoji.isNotEmpty()) {
+                                    Text(
+                                        text = emoji,
+                                        fontSize = 48.sp,
+                                        modifier = Modifier.padding(vertical = 4.dp)
+                                    )
+                                }
+                                if (title.isNotEmpty()) {
+                                    Text(
+                                        text = title,
+                                        style = MaterialTheme.typography.headlineMedium,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.onSurface,
+                                        textAlign = TextAlign.Center,
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(horizontal = 16.dp, vertical = 4.dp)
+                                    )
+                                }
 
                                 if (status.detail != null) {
                                     Text(
                                         text = status.detail,
-                                        style = MaterialTheme.typography.titleMedium,
-                                        fontWeight = FontWeight.Medium,
-                                        color = MaterialTheme.colorScheme.onSurface,
-                                        modifier = Modifier.padding(bottom = 12.dp)
+                                        style = MaterialTheme.typography.bodyLarge,
+                                        fontWeight = FontWeight.Normal,
+                                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.8f),
+                                        textAlign = TextAlign.Center,
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(horizontal = 16.dp, vertical = 4.dp)
                                     )
                                 }
 
@@ -425,6 +446,173 @@ fun DashboardScreen(
                                     style = MaterialTheme.typography.labelMedium,
                                     color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
                                 )
+
+                                // Quick Reactions
+                                HorizontalDivider(
+                                    modifier = Modifier.padding(vertical = 12.dp),
+                                    color = MaterialTheme.colorScheme.outline.copy(alpha = 0.12f)
+                                )
+
+                                Text(
+                                    text = "React to status",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
+                                    modifier = Modifier.padding(bottom = 8.dp)
+                                )
+
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceEvenly
+                                ) {
+                                    val emojis = listOf("❤️", "👍", "😂", "😮", "😢", "🙏")
+                                    emojis.forEach { emoji ->
+                                        IconButton(
+                                            onClick = {
+                                                scope.launch {
+                                                    statusRepo.addReactionToStatus(
+                                                        partnerUid,
+                                                        com.deep.sideglance.domain.model.StatusReaction(
+                                                            senderUid = user.uid,
+                                                            emoji = emoji
+                                                        )
+                                                    )
+                                                }
+                                            },
+                                            modifier = Modifier.size(36.dp)
+                                        ) {
+                                            Text(emoji, fontSize = 20.sp)
+                                        }
+                                    }
+                                }
+
+                                // Messages & Reactions List
+                                val messages = status.messages
+                                val reactions = status.reactions
+                                val combinedInteractions = remember(messages, reactions) {
+                                    val items = mutableListOf<Any>()
+                                    items.addAll(messages)
+                                    items.addAll(reactions)
+                                    items.sortBy {
+                                        when (it) {
+                                            is com.deep.sideglance.domain.model.StatusMessage -> it.timestamp
+                                            is com.deep.sideglance.domain.model.StatusReaction -> it.timestamp
+                                            else -> 0L
+                                        }
+                                    }
+                                    items
+                                }
+
+                                if (combinedInteractions.isNotEmpty()) {
+                                    HorizontalDivider(
+                                        modifier = Modifier.padding(vertical = 12.dp),
+                                        color = MaterialTheme.colorScheme.outline.copy(alpha = 0.12f)
+                                    )
+
+                                    Column(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .heightIn(max = 180.dp)
+                                            .verticalScroll(rememberScrollState()),
+                                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                                    ) {
+                                        combinedInteractions.forEach { interaction ->
+                                            val isMe = when (interaction) {
+                                                is com.deep.sideglance.domain.model.StatusMessage -> interaction.senderUid == user.uid
+                                                is com.deep.sideglance.domain.model.StatusReaction -> interaction.senderUid == user.uid
+                                                else -> false
+                                            }
+                                            val senderName = if (isMe) "You" else (partnerUser?.displayName?.split(" ")?.firstOrNull() ?: "Partner")
+
+                                            Row(
+                                                modifier = Modifier.fillMaxWidth(),
+                                                horizontalArrangement = if (isMe) Arrangement.End else Arrangement.Start
+                                            ) {
+                                                Surface(
+                                                    shape = RoundedCornerShape(12.dp),
+                                                    color = if (isMe) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.secondaryContainer,
+                                                    modifier = Modifier.padding(horizontal = 4.dp)
+                                                ) {
+                                                    Column(modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)) {
+                                                        Text(
+                                                            text = senderName,
+                                                            style = MaterialTheme.typography.labelSmall,
+                                                            color = if (isMe) MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.6f) else MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.6f)
+                                                        )
+                                                        Spacer(modifier = Modifier.height(2.dp))
+                                                        when (interaction) {
+                                                            is com.deep.sideglance.domain.model.StatusMessage -> {
+                                                                Text(
+                                                                    text = interaction.text,
+                                                                    style = MaterialTheme.typography.bodyMedium,
+                                                                    color = if (isMe) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSecondaryContainer
+                                                                )
+                                                            }
+                                                            is com.deep.sideglance.domain.model.StatusReaction -> {
+                                                                Text(
+                                                                    text = "Reacted: ${interaction.emoji}",
+                                                                    style = MaterialTheme.typography.bodyMedium,
+                                                                    color = if (isMe) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSecondaryContainer
+                                                                )
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+
+                                HorizontalDivider(
+                                    modifier = Modifier.padding(vertical = 12.dp),
+                                    color = MaterialTheme.colorScheme.outline.copy(alpha = 0.12f)
+                                )
+
+                                // Chat Message Input
+                                var chatInputText by remember { mutableStateOf("") }
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    OutlinedTextField(
+                                        value = chatInputText,
+                                        onValueChange = { chatInputText = it },
+                                        placeholder = { Text("Send a message...", style = MaterialTheme.typography.bodyMedium) },
+                                        modifier = Modifier.weight(1f),
+                                        shape = RoundedCornerShape(12.dp),
+                                        singleLine = true,
+                                        colors = OutlinedTextFieldDefaults.colors(
+                                            focusedBorderColor = MaterialTheme.colorScheme.primary,
+                                            unfocusedBorderColor = MaterialTheme.colorScheme.outline
+                                        )
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    IconButton(
+                                        onClick = {
+                                            if (chatInputText.isNotBlank()) {
+                                                val textToSend = chatInputText
+                                                chatInputText = ""
+                                                scope.launch {
+                                                    statusRepo.addMessageToStatus(
+                                                        partnerUid,
+                                                        com.deep.sideglance.domain.model.StatusMessage(
+                                                            senderUid = user.uid,
+                                                            text = textToSend
+                                                        )
+                                                    )
+                                                }
+                                            }
+                                        },
+                                        modifier = Modifier
+                                            .size(48.dp)
+                                            .background(MaterialTheme.colorScheme.primaryContainer, CircleShape)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.AutoMirrored.Filled.Send,
+                                            contentDescription = "Send Message",
+                                            tint = MaterialTheme.colorScheme.onPrimaryContainer
+                                        )
+                                    }
+                                }
                             } else {
                                 Text(
                                     text = "😴 Offline",
@@ -553,7 +741,7 @@ fun DashboardScreen(
                     }
 
                     // Personal own status summary card
-                    Box(
+                    Column(
                         modifier = Modifier
                             .fillMaxWidth()
                             .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(20.dp))
@@ -564,7 +752,11 @@ fun DashboardScreen(
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Column {
+                            Column(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .padding(end = 16.dp)
+                            ) {
                                 Text(
                                     text = "Your current status",
                                     style = MaterialTheme.typography.labelMedium,
@@ -584,6 +776,89 @@ fun DashboardScreen(
                                 shape = RoundedCornerShape(12.dp)
                             ) {
                                 Text("Update")
+                            }
+                        }
+
+                        val myMessages = myStatus?.messages ?: emptyList()
+                        val myReactions = myStatus?.reactions ?: emptyList()
+                        val myCombined = remember(myMessages, myReactions) {
+                            val items = mutableListOf<Any>()
+                            items.addAll(myMessages)
+                            items.addAll(myReactions)
+                            items.sortBy {
+                                when (it) {
+                                    is com.deep.sideglance.domain.model.StatusMessage -> it.timestamp
+                                    is com.deep.sideglance.domain.model.StatusReaction -> it.timestamp
+                                    else -> 0L
+                                }
+                            }
+                            items
+                        }
+
+                        if (myCombined.isNotEmpty()) {
+                            HorizontalDivider(
+                                modifier = Modifier.padding(vertical = 12.dp),
+                                color = MaterialTheme.colorScheme.outline.copy(alpha = 0.12f)
+                            )
+                            
+                            Text(
+                                text = "Reactions & Messages",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.5f),
+                                modifier = Modifier.padding(bottom = 6.dp)
+                            )
+
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .heightIn(max = 120.dp)
+                                    .verticalScroll(rememberScrollState()),
+                                verticalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                myCombined.forEach { interaction ->
+                                    val isMe = when (interaction) {
+                                        is com.deep.sideglance.domain.model.StatusMessage -> interaction.senderUid == user.uid
+                                        is com.deep.sideglance.domain.model.StatusReaction -> interaction.senderUid == user.uid
+                                        else -> false
+                                    }
+                                    val senderName = if (isMe) "You" else (partnerUser?.displayName?.split(" ")?.firstOrNull() ?: "Partner")
+
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = if (isMe) Arrangement.End else Arrangement.Start
+                                    ) {
+                                        Surface(
+                                            shape = RoundedCornerShape(10.dp),
+                                            color = if (isMe) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.secondaryContainer,
+                                            modifier = Modifier.padding(horizontal = 2.dp)
+                                        ) {
+                                            Column(modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)) {
+                                                Text(
+                                                    text = senderName,
+                                                    style = MaterialTheme.typography.labelSmall,
+                                                    color = if (isMe) MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.6f) else MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.6f)
+                                                )
+                                                Spacer(modifier = Modifier.height(1.dp))
+                                                when (interaction) {
+                                                    is com.deep.sideglance.domain.model.StatusMessage -> {
+                                                        Text(
+                                                            text = interaction.text,
+                                                            style = MaterialTheme.typography.bodyMedium,
+                                                            color = if (isMe) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSecondaryContainer
+                                                        )
+                                                    }
+                                                    is com.deep.sideglance.domain.model.StatusReaction -> {
+                                                        Text(
+                                                            text = "Reacted: ${interaction.emoji}",
+                                                            style = MaterialTheme.typography.bodyMedium,
+                                                            color = if (isMe) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSecondaryContainer
+                                                        )
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
                             }
                         }
                     }
@@ -630,3 +905,15 @@ private suspend fun triggerWidgetUpdate(
         distance = distanceStr
     )
 }
+
+private fun splitStatusType(statusType: String): Pair<String, String> {
+    val trimmed = statusType.trim()
+    if (trimmed.isEmpty()) return Pair("", "")
+    val parts = trimmed.split(" ", limit = 2)
+    return if (parts.size == 2) {
+        Pair(parts[0], parts[1])
+    } else {
+        Pair("", parts[0])
+    }
+}
+
