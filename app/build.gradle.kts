@@ -14,8 +14,8 @@ android {
         applicationId = "com.deep.sideglance"
         minSdk = 29
         targetSdk = 35
-        versionCode = 2
-        versionName = "1.1"
+        versionCode = 4
+        versionName = "1.3"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
