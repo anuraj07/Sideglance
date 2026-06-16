@@ -31,7 +31,7 @@ class FirebaseAuthRepositoryImpl : AuthRepository {
     }
 
     private fun observeCurrentUserProfile(uid: String) {
-        firestore.collection("users").document(uid)
+        firestore.collection("sideglance/app/users").document(uid)
             .addSnapshotListener { snapshot, error ->
                 if (error != null || snapshot == null) return@addSnapshotListener
                 val firestoreUser = snapshot.toObject(FirestoreUser::class.java)
@@ -50,7 +50,7 @@ class FirebaseAuthRepositoryImpl : AuthRepository {
         val firebaseUser = authResult.user ?: throw Exception("Google Sign In failed: Empty Firebase User")
         
         // Save profile to firestore
-        val userDoc = firestore.collection("users").document(firebaseUser.uid)
+        val userDoc = firestore.collection("sideglance/app/users").document(firebaseUser.uid)
         val existingDoc = userDoc.get().await()
         
         val user = if (existingDoc.exists()) {
@@ -77,7 +77,7 @@ class FirebaseAuthRepositoryImpl : AuthRepository {
     override suspend fun checkUserSession(): User? {
         val firebaseUser = auth.currentUser ?: return null
         return try {
-            val doc = firestore.collection("users").document(firebaseUser.uid).get().await()
+            val doc = firestore.collection("sideglance/app/users").document(firebaseUser.uid).get().await()
             val user = doc.toObject(FirestoreUser::class.java)?.toDomain()
             _currentUser.value = user
             user

@@ -25,7 +25,7 @@ class FirebaseStatusRepositoryImpl : StatusRepository {
 
     override suspend fun updateStatus(status: UserStatus): Result<Unit> = runCatching {
         val uid = auth.currentUser?.uid ?: throw Exception("User not authenticated")
-        firestore.collection("statuses")
+        firestore.collection("sideglance/app/statuses")
             .document(uid)
             .set(FirestoreStatus.fromDomain(status))
             .await()
@@ -33,7 +33,7 @@ class FirebaseStatusRepositoryImpl : StatusRepository {
 
     override suspend fun updateLocation(latitude: Double?, longitude: Double?): Result<Unit> = runCatching {
         val uid = auth.currentUser?.uid ?: throw Exception("User not authenticated")
-        firestore.collection("users")
+        firestore.collection("sideglance/app/users")
             .document(uid)
             .update(
                 mapOf(
@@ -46,7 +46,7 @@ class FirebaseStatusRepositoryImpl : StatusRepository {
     }
 
     override fun observePartnerStatus(partnerUid: String): Flow<UserStatus?> = callbackFlow {
-        val listener = firestore.collection("statuses")
+        val listener = firestore.collection("sideglance/app/statuses")
             .document(partnerUid)
             .addSnapshotListener { snapshot, error ->
                 if (error != null) {
@@ -64,7 +64,7 @@ class FirebaseStatusRepositoryImpl : StatusRepository {
     }
 
     override fun observePartnerLocation(partnerUid: String): Flow<Pair<Double, Double>?> = callbackFlow {
-        val listener = firestore.collection("users")
+        val listener = firestore.collection("sideglance/app/users")
             .document(partnerUid)
             .addSnapshotListener { snapshot, error ->
                 if (error != null) {
@@ -86,7 +86,7 @@ class FirebaseStatusRepositoryImpl : StatusRepository {
     }
 
     override fun observePartnerUser(partnerUid: String): Flow<User?> = callbackFlow {
-        val listener = firestore.collection("users")
+        val listener = firestore.collection("sideglance/app/users")
             .document(partnerUid)
             .addSnapshotListener { snapshot, error ->
                 if (error != null) {
@@ -104,7 +104,7 @@ class FirebaseStatusRepositoryImpl : StatusRepository {
     }
 
     override suspend fun getPartnerStatus(partnerUid: String): UserStatus? = runCatching {
-        val snapshot = firestore.collection("statuses")
+        val snapshot = firestore.collection("sideglance/app/statuses")
             .document(partnerUid)
             .get()
             .await()
@@ -112,7 +112,7 @@ class FirebaseStatusRepositoryImpl : StatusRepository {
     }.getOrNull()
 
     override suspend fun getPartnerUser(partnerUid: String): User? = runCatching {
-        val snapshot = firestore.collection("users")
+        val snapshot = firestore.collection("sideglance/app/users")
             .document(partnerUid)
             .get()
             .await()
@@ -121,7 +121,7 @@ class FirebaseStatusRepositoryImpl : StatusRepository {
 
     override suspend fun addReactionToStatus(statusOwnerUid: String, reaction: StatusReaction): Result<Unit> = runCatching {
         val firestoreReaction = FirestoreStatusReaction.fromDomain(reaction)
-        firestore.collection("statuses")
+        firestore.collection("sideglance/app/statuses")
             .document(statusOwnerUid)
             .set(
                 mapOf("reactions" to FieldValue.arrayUnion(firestoreReaction)),
@@ -132,7 +132,7 @@ class FirebaseStatusRepositoryImpl : StatusRepository {
 
     override suspend fun addMessageToStatus(statusOwnerUid: String, message: StatusMessage): Result<Unit> = runCatching {
         val firestoreMessage = FirestoreStatusMessage.fromDomain(message)
-        firestore.collection("statuses")
+        firestore.collection("sideglance/app/statuses")
             .document(statusOwnerUid)
             .set(
                 mapOf("messages" to FieldValue.arrayUnion(firestoreMessage)),

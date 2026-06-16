@@ -20,14 +20,14 @@ class FirebasePartnerRepositoryImpl : PartnerRepository {
         }
 
         // Verify the partner code corresponds to an existing user
-        val partnerDoc = firestore.collection("users").document(code).get().await()
+        val partnerDoc = firestore.collection("sideglance/app/users").document(code).get().await()
         if (!partnerDoc.exists()) {
             throw Exception("Invalid pairing code: user not found")
         }
 
         firestore.runTransaction { transaction ->
-            val userRef = firestore.collection("users").document(uid)
-            val partnerRef = firestore.collection("users").document(code)
+            val userRef = firestore.collection("sideglance/app/users").document(uid)
+            val partnerRef = firestore.collection("sideglance/app/users").document(code)
 
             transaction.update(userRef, "partnerUid", code)
             transaction.update(partnerRef, "partnerUid", uid)
@@ -36,15 +36,15 @@ class FirebasePartnerRepositoryImpl : PartnerRepository {
 
     override suspend fun unpairPartner(): Result<Unit> = runCatching {
         val uid = auth.currentUser?.uid ?: throw Exception("User not authenticated")
-        val userDoc = firestore.collection("users").document(uid).get().await()
+        val userDoc = firestore.collection("sideglance/app/users").document(uid).get().await()
         val partnerUid = userDoc.getString("partnerUid")
 
         firestore.runTransaction { transaction ->
-            val userRef = firestore.collection("users").document(uid)
+            val userRef = firestore.collection("sideglance/app/users").document(uid)
             transaction.update(userRef, "partnerUid", null)
 
             if (partnerUid != null) {
-                val partnerRef = firestore.collection("users").document(partnerUid)
+                val partnerRef = firestore.collection("sideglance/app/users").document(partnerUid)
                 transaction.update(partnerRef, "partnerUid", null)
             }
         }.await()
