@@ -78,8 +78,22 @@ service cloud.firestore {
       match /users/{userId} {
         // Authenticated users can read profiles to find partners
         allow read: if request.auth != null;
-        // Only the user themselves can update their profile information (e.g. location, partnerUid)
-        allow write: if request.auth != null && request.auth.uid == userId;
+        
+        // Allow writing if:
+        // 1. The user themselves is modifying their profile
+        // 2. Another authenticated user is pairing/unpairing (modifying only the 'partnerUid' field)
+        allow write: if request.auth != null && (
+          request.auth.uid == userId ||
+          (
+            request.resource.data.diff(resource.data).affectedKeys().hasOnly(['partnerUid']) &&
+            (
+              // Pairing: Setting partnerUid to request.auth.uid when it was null/unset
+              (resource.data.get('partnerUid', null) == null && request.resource.data.get('partnerUid', null) == request.auth.uid) ||
+              // Unpairing: Setting partnerUid to null when it was request.auth.uid
+              (resource.data.get('partnerUid', null) == request.auth.uid && request.resource.data.get('partnerUid', null) == null)
+            )
+          )
+        );
       }
       
       // User Statuses, Reactions & Chat Messages
