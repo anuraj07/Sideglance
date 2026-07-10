@@ -33,10 +33,14 @@ class SideGlanceSyncService : Service() {
             val intent = Intent(context, SideGlanceSyncService::class.java).apply {
                 action = ACTION_START
             }
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                context.startForegroundService(intent)
-            } else {
-                context.startService(intent)
+            try {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    context.startForegroundService(intent)
+                } else {
+                    context.startService(intent)
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to start sync service: ${e.message}", e)
             }
         }
 
@@ -44,7 +48,11 @@ class SideGlanceSyncService : Service() {
             val intent = Intent(context, SideGlanceSyncService::class.java).apply {
                 action = ACTION_STOP
             }
-            context.startService(intent)
+            try {
+                context.startService(intent)
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to stop sync service: ${e.message}", e)
+            }
         }
     }
 

@@ -21,14 +21,7 @@ class SideGlanceApplication : Application() {
         
         scheduleWidgetUpdates()
 
-        // Start background sync service if already logged in and paired
-        MainScope().launch {
-            val authRepo = ServiceLocator.authRepository
-            val user = authRepo.checkUserSession() ?: authRepo.currentUser.value
-            if (user != null && user.partnerUid != null) {
-                SideGlanceSyncService.start(this@SideGlanceApplication)
-            }
-        }
+
     }
 
     private fun scheduleWidgetUpdates() {

@@ -16,6 +16,9 @@ import com.deep.sideglance.ui.screens.welcome.WelcomeScreen
 import kotlinx.coroutines.launch
 
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import com.deep.sideglance.data.service.SideGlanceSyncService
 
 @Composable
@@ -31,12 +34,22 @@ fun SideGlanceNavHost(
     // Auth State
     val currentUser by authRepository.currentUser.collectAsState()
     
-    // Start/stop sync service dynamically based on pairing & auth status
-    LaunchedEffect(currentUser) {
-        val user = currentUser
-        if (user != null && user.partnerUid != null) {
-            SideGlanceSyncService.start(context)
-        } else {
+    // Start/stop sync service dynamically based on app lifecycle & pairing status
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner, currentUser) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_START) {
+                val user = currentUser
+                if (user != null && user.partnerUid != null) {
+                    SideGlanceSyncService.start(context)
+                }
+            } else if (event == Lifecycle.Event.ON_STOP) {
+                SideGlanceSyncService.stop(context)
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
             SideGlanceSyncService.stop(context)
         }
     }
