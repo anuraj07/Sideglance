@@ -206,6 +206,12 @@ class SideGlanceSyncService : Service() {
         stopSelf()
     }
 
+    override fun onTimeout(startId: Int, fgsType: Int) {
+        super.onTimeout(startId, fgsType)
+        Log.w(TAG, "Foreground service timed out (fgsType: $fgsType, startId: $startId)")
+        stopForegroundService()
+    }
+
     override fun onDestroy() {
         super.onDestroy()
         serviceScope.cancel()

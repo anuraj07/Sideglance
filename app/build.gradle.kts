@@ -8,12 +8,12 @@ plugins {
 
 android {
     namespace = "com.deep.sideglance"
-    compileSdk = 35
+    compileSdk = 37
 
     defaultConfig {
         applicationId = "com.deep.sideglance"
         minSdk = 29
-        targetSdk = 35
+        targetSdk = 37
         versionCode = 2
         versionName = "1.1"
 
