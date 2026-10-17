@@ -39,18 +39,16 @@ class SideGlanceSyncService : Service() {
                 } else {
                     context.startService(intent)
                 }
-            } catch (e: Exception) {
+            } catch (e: Throwable) {
                 Log.e(TAG, "Failed to start sync service: ${e.message}", e)
             }
         }
 
         fun stop(context: Context) {
-            val intent = Intent(context, SideGlanceSyncService::class.java).apply {
-                action = ACTION_STOP
-            }
             try {
-                context.startService(intent)
-            } catch (e: Exception) {
+                val intent = Intent(context, SideGlanceSyncService::class.java)
+                context.stopService(intent)
+            } catch (e: Throwable) {
                 Log.e(TAG, "Failed to stop sync service: ${e.message}", e)
             }
         }
@@ -76,7 +74,7 @@ class SideGlanceSyncService : Service() {
         // Start observing authentication state and partner info
         observePartnerData()
 
-        return START_STICKY
+        return START_NOT_STICKY
     }
 
     private fun startServiceInForeground() {
@@ -91,8 +89,9 @@ class SideGlanceSyncService : Service() {
             } else {
                 startForeground(NotificationHelper.SYNC_NOTIF_ID, notification)
             }
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             Log.e(TAG, "Failed to start foreground service", e)
+            stopSelf()
         }
     }
 
@@ -214,6 +213,18 @@ class SideGlanceSyncService : Service() {
 
     override fun onDestroy() {
         super.onDestroy()
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                stopForeground(STOP_FOREGROUND_REMOVE)
+            } else {
+                @Suppress("DEPRECATION")
+                stopForeground(true)
+            }
+        } catch (e: Throwable) {
+            Log.e(TAG, "Failed to remove foreground in onDestroy: ${e.message}", e)
+        }
+        syncJob?.cancel()
+        partnerSyncJob?.cancel()
         serviceScope.cancel()
         Log.d(TAG, "Sync Service destroyed")
     }
@@ -224,6 +235,7 @@ class SideGlanceSyncService : Service() {
 
     override fun onTaskRemoved(rootIntent: Intent?) {
         super.onTaskRemoved(rootIntent)
-        Log.d(TAG, "onTaskRemoved called - service will persist because stopWithTask is false and it is sticky")
+        Log.d(TAG, "onTaskRemoved called - stopping sync service")
+        stopForegroundService()
     }
 }
