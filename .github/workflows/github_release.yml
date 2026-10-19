@@ -1,6 +1,11 @@
 name: Publish GitHub Release (APK)
 
 on:
+  workflow_run:
+    workflows: ["Google Play Store Closed Testing Release"]
+    types:
+      - completed
+
   workflow_dispatch:
     inputs:
       versionName:
@@ -38,12 +43,25 @@ jobs:
   release:
     name: Build & Publish Release APK
     runs-on: ubuntu-latest
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event_name == 'push' || (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success') }}
 
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+
+      - name: Checkout Release Branch (if triggered by Play Store workflow)
+        if: github.event_name == 'workflow_run'
+        run: |
+          git fetch --all --tags
+          LATEST_RELEASE_BRANCH=$(git branch -r --list 'origin/release/*' --sort=-committerdate | head -n 1 | sed 's/origin\///' | tr -d ' ')
+          if [ -n "$LATEST_RELEASE_BRANCH" ]; then
+            echo "Checking out latest release branch: $LATEST_RELEASE_BRANCH"
+            git checkout "$LATEST_RELEASE_BRANCH"
+          else
+            echo "No origin/release/* branch found, staying on default branch: $(git branch --show-current)"
+          fi
 
       - name: Set up JDK 17
         uses: actions/setup-java@v4
